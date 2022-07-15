@@ -20,7 +20,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	db.AutoMigrate(&guest.Waiting{})
+	log.Println("Starting DataBase AutoMigrate")
+	err = db.AutoMigrate(&guest.Waiting{})
+	if err != nil {
+		log.Println("Failed to DataBase AutoMigrate")
+		log.Println(err)
+	}
 
 	if err := app.Listen(":3000"); err != nil {
 		log.Println("Failed to Runing Server...!")
