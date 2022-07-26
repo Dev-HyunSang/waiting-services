@@ -15,6 +15,7 @@ type RestaurantINFO struct {
 	RestaurantUUID           uuid.UUID `json:"restaurant_uuid"`     // 각 레스토랑마다 고유 UUID
 	RestaurantName           string    `json:"restaurant_name"`     // 레스토랑 가게명
 	RestaurantLocation       string    `json:"restaurant_location"` // 레스토랑 위치
+	RestaurantPhoneNumber    string    `json:"restaurant_phone_number"`
 	RestaurantOwnerName      string    `json:"restaurant_owner_name"`
 	RestaurantBusinessNumber string    `json:"restaurant_business_number"`
 	RestaurantPassword       string    `json:"restaurant_password"`
@@ -116,11 +117,13 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 	}
 
 	// JWT 토큰 발행
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-	claims["restaurant_uuid"] = restaurantInfo.RestaurantUUID
-	claims["exp"] = time.Now().Add(time.Minute * 30).Unix() // 토큰 만료 30분 설정
-	t, err := token.SignedString([]byte("secret"))
+	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		Issuer:    restaurantInfo.RestaurantUUID.String(),
+		Subject:   "restaurant admin page login",
+		ExpiresAt: time.Now().Add(time.Minute * 30).Unix(),
+	})
+
+	token, err := claims.SignedString([]byte("secret"))
 	if err != nil {
 		log.Println("Failed to Publish JWT")
 		log.Println(err)
@@ -129,7 +132,7 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 	// 쿠키 설정
 	cookie := fiber.Cookie{
 		Name:     "jwt",
-		Value:    t,
+		Value:    token,
 		Expires:  time.Now().Add(time.Minute * 30), // 쿠키 만료 시간 30분
 		HTTPOnly: true,
 	}
@@ -139,6 +142,7 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 	return c.Status(200).JSON(fiber.Map{
 		"status":  200,
 		"message": "성공적으로 로그인 되었습니다.",
+		"key":     token,
 		"time":    time.Now(),
 	})
 }
@@ -146,12 +150,15 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 func RestaurantHomeHandler(c *fiber.Ctx) error {
 	cookie := c.Cookies("jwt")
 
-	token, err := jwt.ParseWithClaims(cookie, jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte("secret"), nil
 	})
+
 	if err != nil {
-		log.Println("Failed to Get JWT")
-		log.Println(err)
+		c.Status(fiber.StatusUnauthorized)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "unauthenticated",
+		})
 	}
 
 	claims := token.Claims.(*jwt.StandardClaims)
@@ -162,10 +169,10 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
-	var RestaurantInfo RestaurantINFO
-	db.Where("restaurant_uuid = ?", claims.Issuer).First(&RestaurantInfo)
+	var restaurantInfo RestaurantINFO
+	db.Table("restaurant_infos").Where("restaurant_uuid = ?", claims.Issuer).First(&restaurantInfo)
 
-	return c.Status(200).JSON(RestaurantInfo)
+	return c.Status(200).JSON(restaurantInfo)
 
 }
 
