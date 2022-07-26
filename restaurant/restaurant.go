@@ -4,7 +4,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/dev-hyunsang/waiting-services/config"
 	"github.com/dev-hyunsang/waiting-services/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofrs/uuid"
@@ -82,6 +81,15 @@ func LoginRestaurantHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
+	// 사용자가 입력을 하였는지 확인함.
+	if req.RestaurantBusinessNumber == "" || req.RestaurantPassword == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  fiber.StatusBadRequest,
+			"message": "정보가 제대로 입력되지 않았습니다. 확인 후 다시 시도 해 주세요.",
+			"time":    time.Now(),
+		})
+	}
+
 	db, err := database.ConntectionSQLite()
 	if err != nil {
 		log.Println("[ERROR] NewRestaurant | Failed to DataBase Connection")
@@ -89,18 +97,17 @@ func LoginRestaurantHandler(c *fiber.Ctx) error {
 	}
 
 	var restaurantInfo RestaurantINFO
-	db.Table("").Where("restaurant_business_number = ?", req.RestaurantBusinessNumber).Find(restaurantInfo)
-
-	if req.RestaurantBusinessNumber != restaurantInfo.RestaurantBusinessNumber {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"status":  fiber.StatusUnauthorized,
-			"message": "입력하신 정보가 일치하지 않아요. 다시 입력해 보시겠어요?",
+	result := db.Table("restaurant_infos").Where("restaurant_business_number = ?", req.RestaurantBusinessNumber).First(&restaurantInfo)
+	if result.RowsAffected == 0 {
+		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
+			"status":  fiber.ErrBadRequest.Code,
+			"message": "입력하신 정보를 토대로 사용자 정보를 찾을 수 없어요. 다시 학인해 주세요!",
 			"time":    time.Now(),
 		})
 	}
-
 	err = bcrypt.CompareHashAndPassword([]byte(restaurantInfo.RestaurantPassword), []byte(req.RestaurantPassword))
 	if err != nil {
+		log.Println(err)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status":  fiber.StatusUnauthorized,
 			"message": "입력하신 정보가 일치하지 않아요. 다시 입력해 보시겠어요?",
@@ -108,25 +115,56 @@ func LoginRestaurantHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	claims := jwt.MapClaims{
-		"restaurant_uuid": restaurantInfo.RestaurantUUID,
-		"restaurant_name": restaurantInfo.RestaurantName,
-		"bussines_number": restaurantInfo.RestaurantBusinessNumber,
-		"exp":             time.Now().Add(time.Hour * 24).Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	t, err := token.SignedString([]byte(config.GetEnv("JWT_KEY")))
+	// JWT 토큰 발행
+	token := jwt.New(jwt.SigningMethodHS256)
+	claims := token.Claims.(jwt.MapClaims)
+	claims["restaurant_uuid"] = restaurantInfo.RestaurantUUID
+	claims["exp"] = time.Now().Add(time.Minute * 30).Unix() // 토큰 만료 30분 설정
+	t, err := token.SignedString([]byte("secret"))
 	if err != nil {
-		log.Println("Failed to JWT SignedString")
+		log.Println("Failed to Publish JWT")
 		log.Println(err)
 	}
 
+	// 쿠키 설정
+	cookie := fiber.Cookie{
+		Name:     "jwt",
+		Value:    t,
+		Expires:  time.Now().Add(time.Minute * 30), // 쿠키 만료 시간 30분
+		HTTPOnly: true,
+	}
+
+	c.Cookie(&cookie)
+
 	return c.Status(200).JSON(fiber.Map{
 		"status":  200,
-		"message": "정상적으로 로그인이 되었습니다.",
-		"token":   t,
+		"message": "성공적으로 로그인 되었습니다.",
 		"time":    time.Now(),
 	})
+}
+
+func RestaurantHomeHandler(c *fiber.Ctx) error {
+	cookie := c.Cookies("jwt")
+
+	token, err := jwt.ParseWithClaims(cookie, jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte("secret"), nil
+	})
+	if err != nil {
+		log.Println("Failed to Get JWT")
+		log.Println(err)
+	}
+
+	claims := token.Claims.(*jwt.StandardClaims)
+
+	db, err := database.ConntectionSQLite()
+	if err != nil {
+		log.Println("Failed to Connection SQLite")
+		log.Println(err)
+	}
+
+	var RestaurantInfo RestaurantINFO
+	db.Where("restaurant_uuid = ?", claims.Issuer).First(&RestaurantInfo)
+
+	return c.Status(200).JSON(RestaurantInfo)
+
 }
