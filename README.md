@@ -3,5 +3,4 @@
 
 ## INFO
 ### DataBase
-- `fiber.sqlite3`: Session 관련 정보를 저장합니다.
 - `waiting-services.db`: 사용자 정보를 저장합니다.
