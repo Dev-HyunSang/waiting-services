@@ -13,7 +13,6 @@ import (
 func main() {
 	app := fiber.New()
 
-	restaurant.NewSessionStore()
 	middleware.Middleware(app)
 
 	db, err := database.ConntectionSQLite()
