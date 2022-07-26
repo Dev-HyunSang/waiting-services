@@ -29,7 +29,7 @@ type RequestRestaurantLogin struct {
 	LoginedAt                time.Time `json:"logined_at"`
 }
 
-func NewRestaurantHandler(c *fiber.Ctx) error {
+func RestaurantSignUpHandler(c *fiber.Ctx) error {
 	req := new(RestaurantINFO)
 	if err := c.BodyParser(req); err != nil {
 		log.Println("[ERROR] NewRestaurant | Failed to BodyParser")
@@ -74,7 +74,7 @@ func NewRestaurantHandler(c *fiber.Ctx) error {
 
 }
 
-func LoginRestaurantHandler(c *fiber.Ctx) error {
+func RestaurantLoginHandler(c *fiber.Ctx) error {
 	req := new(RequestRestaurantLogin)
 	if err := c.BodyParser(req); err != nil {
 		log.Println("[ERROR] NewRestaurant | Failed to BodyParser")
@@ -167,4 +167,21 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 
 	return c.Status(200).JSON(RestaurantInfo)
 
+}
+
+func RestaurantLogOutHandler(c *fiber.Ctx) error {
+	cookie := fiber.Cookie{
+		Name:     "jwt",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+	}
+
+	c.Cookie(&cookie)
+
+	return c.Status(200).JSON(fiber.Map{
+		"status":  200,
+		"message": "성공적으로 로그아웃 되셨습니다.",
+		"time":    time.Now(),
+	})
 }
