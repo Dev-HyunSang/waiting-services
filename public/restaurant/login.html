@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Admin Login</title>
+</head>
+<style>
+    .main-container {
+        margin: 15% auto;
+        text-align: center;
+    }
+    input[type="text"], input[type="password"] {
+        width: 400px;
+        height: 50px;
+        margin-bottom: 20px;
+    }
+    
+</style>
+<body>
+    <div class="main-container">
+        <h1 class="title">어서오세요!</h1>
+        <div class="input-area">
+            <input type="text" id="business_number" name="business_number" >
+            <br>
+            <input type="password" name="password" id="password">
+            <br>
+            <input type="submit" value="Login" onclick="ReqeustLogin()">
+        </div>
+    </div>
+</body>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    function ReqeustLogin() {
+        businessNumber = document.getElementById("business_number").value
+        password = document.getElementById("password").value
+
+        var data = JSON.stringify({
+            "restaurant_business_number": businessNumber,
+            "restaurant_password": password,
+        });
+
+        var config = {
+            method: 'post',
+            url: 'http://127.0.0.1:3000/api/restaurant/login',
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            data : data,
+            withCredentials: true,
+            crossDomain: true, 
+            credentials: "include",
+        };
+        
+        axios(config)
+        .then(function(response) {
+            console.log(response.data);
+            if (response.data.status === 200) {
+                // 만역 로그인 요청이 정상적으로 처리 되었다면 로그인 이후 접근 가능한 페이지로 넘어가게 함.
+                window.location.href = "/restaurant/home.html";
+            }
+        }).catch(function(error) {
+            console.error(error);
+        })
+    }
+</script>
+</html>

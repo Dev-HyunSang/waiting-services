@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Admin Home</title>
+</head>
+<body onload="checkingLogin()">
+    <div class="main-container">
+        <h1>Welecome to <span></span></h1>
+    </div>
+    <button onclick="logOut()">LogOut</button>
+</body>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    // 로그인이 정상적으로 되었는지 확인함.
+    function checkingLogin() {
+        var config = {
+            method: 'post',
+            url: 'http://127.0.0.1:3000/api/restaurant/home',
+            credentials: 'include',
+        };
+        
+        axios(config)
+        .then(function(response) {
+            console.log(response.data);
+        }).catch(function(error) {
+            // 만약 사용자가 로그인을 하지 않고 접근할 시 서버 측에선 401 코드를 주어서 접근을 막음.
+            // 401 코드를 확인하였고 로그인을 하지 않은 상태이니 로그인을 할 수 있도록 홈 화면으로 돌려버림.
+            if(error.response.status == 401) {
+                window.location.href = "/";
+                alert("로그인 후 시도해 주세요.")
+            }
+        })
+    }
+
+    function logOut() {
+        var config = {
+            method: 'post',
+            url: 'http://127.0.0.1:3000/api/restaurant/logout',
+        };
+        
+        axios(config)
+        .then(function(response) {
+            console.log(response.data.status);
+            if (response.data.status === 200) {
+                window.location.href = "/";
+
+            }
+        }).catch(function(error) {
+            console.error(error);
+        })
+    }
+</script>
+</html>
