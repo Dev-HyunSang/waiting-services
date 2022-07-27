@@ -29,7 +29,7 @@ func Middleware(app *fiber.App) {
 
 	Restaurant := api.Group("/restaurant")
 	Restaurant.Post("/join", restaurant.RestaurantSignUpHandler)
-	Restaurant.Post("/login", restaurant.RestaurantLogOutHandler)
+	Restaurant.Post("/login", restaurant.RestaurantLoginHandler)
 	Restaurant.Post("/home", restaurant.RestaurantHomeHandler)
 	Restaurant.Post("/logout", restaurant.RestaurantLogOutHandler)
 }
