@@ -6,20 +6,20 @@ import (
 	"time"
 
 	"github.com/dev-hyunsang/waiting-services/database"
-	"github.com/dev-hyunsang/waiting-services/mail"
+	"github.com/dev-hyunsang/waiting-services/restaurant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofrs/uuid"
 )
 
 type Waiting struct {
-	WaitingUUID uuid.UUID `json:"waiting_uuid" gorm:"column:waiting_uuid;"`
-	StoreUUID   uuid.UUID `json:"store_uuid" gorm:"column:store_uuid"`
-	StoreName   string    `json:"store_name" gorm:"column:store_name"`
-	Name        string    `json:"name" gorm:"column: name;"`
-	Email       string    `json:"email" gorm:"column:email"`
-	Status      string    `json:"status" gorm:"column:status;"`
-	CreatedAt   time.Time `json:"created_at" gorm:"column:created_at;"`
-	DeletedAt   time.Time `json:"deleted_at" gorm:"column:deleted_at;"`
+	WaitingUUID    uuid.UUID `json:"waiting_uuid" gorm:"column:waiting_uuid;"`
+	RestaurantUUID uuid.UUID `json:"store_uuid" gorm:"column:store_uuid"`
+	RestaurantName string    `json:"store_name" gorm:"column:store_name"`
+	Name           string    `json:"name" gorm:"column: name;"`
+	Email          string    `json:"email" gorm:"column:email"`
+	Status         string    `json:"status" gorm:"column:status;"`
+	CreatedAt      time.Time `json:"created_at" gorm:"column:created_at;"`
+	DeletedAt      time.Time `json:"deleted_at" gorm:"column:deleted_at;"`
 }
 
 /* HOW TO WORKING SERVICES?
@@ -32,6 +32,20 @@ type Waiting struct {
       웨이팅 등록 시 주의사항을 꼭 유저에게 알릴 수 있도록 제작해요.
 4. 가게 측에 도착 했으면 가게 측에서 확인하고 순번을 삭제해요.
 */
+
+// 등록 되어 있는 가게를 검색하는 기능
+func RestaurantSearch(search string) restaurant.RestaurantINFO {
+	db, err := database.ConntectionSQLite()
+	if err != nil {
+		log.Println("Failed to DataBase Connection SQLite")
+		log.Println(err)
+	}
+
+	var restaurantInfo restaurant.RestaurantINFO
+	db.Table("restaurant_infos").Where("restaurant_name = ?", search).First(&restaurantInfo)
+
+	return restaurantInfo
+}
 
 func NewWaitingHandler(c *fiber.Ctx) error {
 	req := new(Waiting)
@@ -83,8 +97,6 @@ func CallWaitingHandler(c *fiber.Ctx) error {
 	}
 
 	db.Where("wating_uuid = ?", req.WaitingUUID).Find(wating)
-
-	mail.SendEmail(wating.Email, wating.Name, wating.StoreName)
 
 	return c.Status(200).JSON(fiber.Map{})
 }
