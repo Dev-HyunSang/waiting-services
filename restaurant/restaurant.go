@@ -37,6 +37,17 @@ func RestaurantSignUpHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
+	var joinedInfo models.RestaurantINFO
+	// 이미 가입 되어 있는 동일한 사업자 번호가 있는 경우.
+	result := db.Table("restaurant_infos").Where("restaurant_business_number = ?", req.RestaurantBusinessNumber).First(&joinedInfo)
+	if result.RowsAffected == 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  fiber.StatusBadRequest,
+			"message": "이미 등록되어 있는 가게입니다. 확인 후 다시 시도 해 주세요.",
+			"time":    time.Now(),
+		})
+	}
+
 	db.Table("restaurant_infos").Create(models.RestaurantINFO{
 		RestaurantUUID:           restaurantUUID,
 		RestaurantName:           req.RestaurantName,
@@ -81,6 +92,7 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 
 	var restaurantInfo models.RestaurantINFO
 	result := db.Table("restaurant_infos").Where("restaurant_business_number = ?", req.RestaurantBusinessNumber).First(&restaurantInfo)
+	// 동일한 정보를 찾을 수 없을 때
 	if result.RowsAffected == 0 {
 		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
 			"status":  fiber.ErrBadRequest.Code,
@@ -88,6 +100,7 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 			"time":    time.Now(),
 		})
 	}
+
 	err = bcrypt.CompareHashAndPassword([]byte(restaurantInfo.RestaurantPassword), []byte(req.RestaurantPassword))
 	if err != nil {
 		log.Println(err)
@@ -156,7 +169,16 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 	var restaurantInfo models.RestaurantINFO
 	db.Table("restaurant_infos").Where("restaurant_uuid = ?", claims.Issuer).First(&restaurantInfo)
 
-	return c.Status(200).JSON(restaurantInfo)
+	var waiting []models.Waiting
+	db.Table("waitings").Where("restaurant_uuid = ?", claims.Issuer).Find(&waiting)
+
+	return c.Status(200).JSON(fiber.Map{
+		"staus":           200,
+		"message":         "성공적으로 레스토랑의 정보를 불러 왔습니다.",
+		"restaurant_data": restaurantInfo,
+		"waiting_data":    waiting,
+		"time":            time.Now(),
+	})
 }
 
 func RestaurantLogOutHandler(c *fiber.Ctx) error {
