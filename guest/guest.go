@@ -6,21 +6,11 @@ import (
 	"time"
 
 	"github.com/dev-hyunsang/waiting-services/database"
-	"github.com/dev-hyunsang/waiting-services/restaurant"
+	"github.com/dev-hyunsang/waiting-services/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofrs/uuid"
+	"github.com/golang-jwt/jwt/v4"
 )
-
-type Waiting struct {
-	WaitingUUID    uuid.UUID `json:"waiting_uuid" gorm:"column:waiting_uuid;"`
-	RestaurantUUID uuid.UUID `json:"store_uuid" gorm:"column:store_uuid"`
-	RestaurantName string    `json:"store_name" gorm:"column:store_name"`
-	Name           string    `json:"name" gorm:"column: name;"`
-	Email          string    `json:"email" gorm:"column:email"`
-	Status         string    `json:"status" gorm:"column:status;"`
-	CreatedAt      time.Time `json:"created_at" gorm:"column:created_at;"`
-	DeletedAt      time.Time `json:"deleted_at" gorm:"column:deleted_at;"`
-}
 
 /* HOW TO WORKING SERVICES?
 1. 유저가 새로운 웨이팅을 가게를 검색한 후 등록해요.
@@ -33,22 +23,60 @@ type Waiting struct {
 4. 가게 측에 도착 했으면 가게 측에서 확인하고 순번을 삭제해요.
 */
 
+func WaitingHomeHandler(c *fiber.Ctx) error {
+	cookie := c.Cookies("jwt")
+
+	token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte("secret"), nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status":  fiber.StatusUnauthorized,
+			"message": "unauthenticated",
+			"time":    time.Now(),
+		})
+	}
+
+	clamis := token.Claims.(*jwt.StandardClaims)
+
+	db, err := database.ConntectionSQLite()
+	if err != nil {
+		log.Println("Failed to Connection SQLite")
+		log.Println(err)
+	}
+
+	var (
+		user   models.User
+		wating models.Waiting
+	)
+	db.Table("").Where("user_uuid = ?", clamis.Issuer).First(&user)
+
+	db.Table("").Where("user_uuid = ?", user.UserUUID).First(&wating)
+
+	return c.Status(200).JSON(fiber.Map{
+		"status":  200,
+		"message": "성공적으로 웨이팅 정보를 불러 왔습니다.",
+		"datas":   wating,
+		"time":    time.Now(),
+	})
+}
+
 // 등록 되어 있는 가게를 검색하는 기능
-func RestaurantSearch(search string) restaurant.RestaurantINFO {
+func RestaurantSearch(search string) models.RestaurantINFO {
 	db, err := database.ConntectionSQLite()
 	if err != nil {
 		log.Println("Failed to DataBase Connection SQLite")
 		log.Println(err)
 	}
 
-	var restaurantInfo restaurant.RestaurantINFO
+	var restaurantInfo models.RestaurantINFO
 	db.Table("restaurant_infos").Where("restaurant_name = ?", search).First(&restaurantInfo)
 
 	return restaurantInfo
 }
 
 func NewWaitingHandler(c *fiber.Ctx) error {
-	req := new(Waiting)
+	req := new(models.Waiting)
 	if err := c.BodyParser(req); err != nil {
 		log.Println("Failed to BodyParser")
 		log.Println(err)
@@ -66,37 +94,21 @@ func NewWaitingHandler(c *fiber.Ctx) error {
 		log.Fatalln(err)
 	}
 
-	db.Table("waitings").Create(Waiting{
-		WaitingUUID: waitingUUID,
-		Name:        req.Name,
-		Email:       req.Email,
-		Status:      "waiting",
-		CreatedAt:   time.Now(),
-		DeletedAt:   time.Now(),
+	var user models.User
+	db.Table("user").Where("user_uuid =?", req.UserUUID).Find(&user)
+
+	db.Table("waitings").Create(models.Waiting{
+		WaitingUUID:    waitingUUID,
+		RestaurantUUID: req.RestaurantUUID,
+		UserUUID:       user.UserUUID,
+		Status:         false,
+		CreatedAt:      time.Now(),
+		DeletedAt:      time.Now(),
 	})
 
 	return c.Status(200).JSON(fiber.Map{
 		"status":  200,
-		"message": fmt.Sprintf("%s님! 성공적으로 등록되었어요. 순서가 되면 문자로 알려드릴께요!", req.Name),
+		"message": fmt.Sprintf("%s님! 성공적으로 등록되었어요. 순서가 되면 문자로 알려드릴께요!", user.Name),
 		"time":    time.Now(),
 	})
-}
-
-func CallWaitingHandler(c *fiber.Ctx) error {
-	var wating Waiting
-	req := new(Waiting)
-	if err := c.BodyParser(req); err != nil {
-		log.Println("Failed to BodyParser")
-		log.Println(err)
-	}
-
-	db, err := database.ConntectionSQLite()
-	if err != nil {
-		log.Println("Failed to Connection SQLite")
-		log.Fatalln(err)
-	}
-
-	db.Where("wating_uuid = ?", req.WaitingUUID).Find(wating)
-
-	return c.Status(200).JSON(fiber.Map{})
 }

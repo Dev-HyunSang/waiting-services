@@ -5,33 +5,15 @@ import (
 	"time"
 
 	"github.com/dev-hyunsang/waiting-services/database"
+	"github.com/dev-hyunsang/waiting-services/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofrs/uuid"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type RestaurantINFO struct {
-	RestaurantUUID           uuid.UUID `json:"restaurant_uuid"`     // 각 레스토랑마다 고유 UUID
-	RestaurantName           string    `json:"restaurant_name"`     // 레스토랑 가게명
-	RestaurantLocation       string    `json:"restaurant_location"` // 레스토랑 위치
-	RestaurantPhoneNumber    string    `json:"restaurant_phone_number"`
-	RestaurantOwnerName      string    `json:"restaurant_owner_name"`
-	RestaurantBusinessNumber string    `json:"restaurant_business_number"`
-	RestaurantPassword       string    `json:"restaurant_password"`
-	CreatedAt                time.Time `json:"created__at"`
-	EditedAt                 time.Time `json:"edited_at"`
-	DeletedAt                time.Time `json:"deleted_at"`
-}
-
-type RequestRestaurantLogin struct {
-	RestaurantBusinessNumber string    `json:"restaurant_business_number"`
-	RestaurantPassword       string    `json:"restaurant_password"`
-	LoginedAt                time.Time `json:"logined_at"`
-}
-
 func RestaurantSignUpHandler(c *fiber.Ctx) error {
-	req := new(RestaurantINFO)
+	req := new(models.RestaurantINFO)
 	if err := c.BodyParser(req); err != nil {
 		log.Println("[ERROR] NewRestaurant | Failed to BodyParser")
 		log.Println(err)
@@ -55,7 +37,7 @@ func RestaurantSignUpHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
-	db.Table("restaurant_infos").Create(RestaurantINFO{
+	db.Table("restaurant_infos").Create(models.RestaurantINFO{
 		RestaurantUUID:           restaurantUUID,
 		RestaurantName:           req.RestaurantName,
 		RestaurantLocation:       req.RestaurantLocation,
@@ -76,7 +58,7 @@ func RestaurantSignUpHandler(c *fiber.Ctx) error {
 }
 
 func RestaurantLoginHandler(c *fiber.Ctx) error {
-	req := new(RequestRestaurantLogin)
+	req := new(models.RequestRestaurantLogin)
 	if err := c.BodyParser(req); err != nil {
 		log.Println("[ERROR] NewRestaurant | Failed to BodyParser")
 		log.Println(err)
@@ -97,7 +79,7 @@ func RestaurantLoginHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
-	var restaurantInfo RestaurantINFO
+	var restaurantInfo models.RestaurantINFO
 	result := db.Table("restaurant_infos").Where("restaurant_business_number = ?", req.RestaurantBusinessNumber).First(&restaurantInfo)
 	if result.RowsAffected == 0 {
 		return c.Status(fiber.ErrBadRequest.Code).JSON(fiber.Map{
@@ -157,7 +139,9 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"status":  fiber.StatusUnauthorized,
 			"message": "unauthenticated",
+			"time":    time.Now(),
 		})
 	}
 
@@ -169,11 +153,10 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 		log.Println(err)
 	}
 
-	var restaurantInfo RestaurantINFO
+	var restaurantInfo models.RestaurantINFO
 	db.Table("restaurant_infos").Where("restaurant_uuid = ?", claims.Issuer).First(&restaurantInfo)
 
 	return c.Status(200).JSON(restaurantInfo)
-
 }
 
 func RestaurantLogOutHandler(c *fiber.Ctx) error {
