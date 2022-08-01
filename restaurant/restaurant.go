@@ -150,7 +150,6 @@ func RestaurantHomeHandler(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		c.Status(fiber.StatusUnauthorized)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"status":  fiber.StatusUnauthorized,
 			"message": "unauthenticated",
